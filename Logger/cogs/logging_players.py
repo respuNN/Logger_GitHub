@@ -5,14 +5,11 @@ import re
 import sqlite3
 import time
 from datetime import datetime, time, timedelta
-from json.decoder import JSONDecodeError
 
 import discord
 import requests
-from discord.ext import commands, tasks
-from requests.exceptions import RequestException
-
 from cogs.databases import *
+from discord.ext import commands, tasks
 
 
 class logging_players(commands.Cog):
