@@ -148,7 +148,7 @@ class logging_players(commands.Cog):
                                 conn.commit()
                                 pass
                             else:
-                                conn = sqlite3.connect('players.db')
+                                conn = sqlite3.connect("players.db")
                                 cursor = conn.cursor()
 
                             # Insert or update the player into all_players
@@ -217,14 +217,14 @@ class logging_players(commands.Cog):
                                 player_data["discord_id"],
                                 player_data["game_id"],
                                 f"Joined at {full_date_str}",
-                                discord.Color.from_rgb(231, 143, 142)
+                                discord.Color.from_rgb(231, 143, 142),
                             )
 
                             if is_connection_alive(conn):
                                 conn.commit()
                                 pass
                             else:
-                                conn = sqlite3.connect('players.db')
+                                conn = sqlite3.connect("players.db")
                                 cursor = conn.cursor()
 
                             # Update the all_players with left_at timestamp
@@ -255,14 +255,14 @@ class logging_players(commands.Cog):
                                 player_data["discord_id"],
                                 player_data["game_id"],
                                 f"Joined at {full_date_str}",
-                                discord.Color.from_rgb(27, 153, 139)
+                                discord.Color.from_rgb(27, 153, 139),
                             )
 
                             if is_connection_alive(conn):
                                 conn.commit()
                                 pass
                             else:
-                                conn = sqlite3.connect('players.db')
+                                conn = sqlite3.connect("players.db")
                                 cursor = conn.cursor()
 
                             # Insert or update the player into all_players
@@ -338,7 +338,6 @@ class logging_players(commands.Cog):
             conn.close()
             self.is_running = False
 
-
     @commands.command()
     async def config(
         self, ctx, server_ip: str = None, port: int = None, channel_id: int = None
@@ -365,11 +364,19 @@ class logging_players(commands.Cog):
                     else:
                         embed.add_field(
                             name=f"Your current configuration:",
-                            value=f"You currently do not have any configurations.",
+                            value=f"Your current configuration is corrupted.",
                             inline=True,
                         )
                         await ctx.send(embed=embed)
                         return
+                else:
+                    embed.add_field(
+                        name=f"Your current configuration:",
+                        value=f"You currently do not have any configurations.",
+                        inline=True,
+                    )
+                    await ctx.send(embed=embed)
+                    return
 
             # Check if the provided table name is valid to avoid SQL injection
             if server_ip == None or port == None or channel_id == None:
@@ -440,25 +447,28 @@ def is_connection_alive(conn):
         return False
 
 
-async def create_and_send_embed(self, channel, title, discord_id, game_id, footer_text, color):
+async def create_and_send_embed(
+    self, channel, title, discord_id, game_id, footer_text, color
+):
     user = await self.bot.fetch_user(discord_id)
     discord_username = user.name
     user_avatar_url = str(user.avatar.url)
     bot_avatar_url = str(self.bot.user.avatar.url)
     discord_link = f"https://discordapp.com/users/{discord_id}"
-    
+
     steam_decimal = int(discord_id, 16)
     steam_link = f"https://steamcommunity.com/profiles/{steam_decimal}"
 
-    embed = discord.Embed(
-        title=title,
-        color=color
-    )
+    embed = discord.Embed(title=title, color=color)
     embed.set_author(name=discord_username, icon_url=user_avatar_url)
     embed.set_thumbnail(url=bot_avatar_url)
     embed.add_field(name=f"", value=f"**Ingame ID:** {game_id}", inline=False)
-    embed.add_field(name=f"", value=f"**Discord ID:** [{discord_id}]({discord_link})", inline=False)
-    embed.add_field(name=f"", value=f"**Steam Hex:** [{discord_id}]({steam_link})", inline=False)
+    embed.add_field(
+        name=f"", value=f"**Discord ID:** [{discord_id}]({discord_link})", inline=False
+    )
+    embed.add_field(
+        name=f"", value=f"**Steam Hex:** [{discord_id}]({steam_link})", inline=False
+    )
     embed.set_footer(text=footer_text)
 
     await channel.send(embed=embed)
@@ -522,9 +532,13 @@ async def connecting_json_data(self):
                     discord.Color.from_rgb(139, 139, 174),
                     full_date_str,
                 )
-                
+
                 await self.bot.change_presence(
-                status=discord.Status.online,activity=discord.Activity(type=discord.ActivityType.watching, name="restart procedure"),)
+                    status=discord.Status.online,
+                    activity=discord.Activity(
+                        type=discord.ActivityType.watching, name="restart procedure"
+                    ),
+                )
 
                 await asyncio.sleep(300)  # Wait for 5 minutes
                 databases.delete_all_data(self)
