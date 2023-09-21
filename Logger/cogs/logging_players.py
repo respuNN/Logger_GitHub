@@ -1,5 +1,6 @@
 # Importing modules
 import asyncio
+import json
 import re
 import sqlite3
 import time
@@ -50,7 +51,7 @@ class logging_players(commands.Cog):
         if self.is_running:
             print("Previous loop iteration still running. Skipping this iteration.")
             return
-        
+
         self.is_running = True
 
         try:
@@ -63,9 +64,8 @@ class logging_players(commands.Cog):
                     self.logging_players_loop.cancel()
                     return
 
-                utc_now = datetime.utcnow()
-                gmt_plus_3 = utc_now + timedelta(hours=3)
-                ts = int(gmt_plus_3.timestamp())
+                gmt_plus_3_time = datetime.utcnow() + timedelta(hours=3)
+                full_date_str = gmt_plus_3_time.strftime("%H:%M:%S - %d/%m/%Y")
 
                 conn = sqlite3.connect("players.db")
                 cursor = conn.cursor()
@@ -147,6 +147,13 @@ class logging_players(commands.Cog):
                         }
 
                         if self.logging_executed:
+                            if is_connection_alive(conn):
+                                conn.commit()
+                                pass
+                            else:
+                                conn = sqlite3.connect('players.db')
+                                cursor = conn.cursor()
+
                             # Insert or update the player into all_players
                             cursor.execute(
                                 """
@@ -164,7 +171,7 @@ class logging_players(commands.Cog):
                                     license2_id,
                                     xbl,
                                     live_id,
-                                    f"<t:{ts}:t>",
+                                    full_date_str,
                                     "Hasn't left yet.",
                                 ),
                             )
@@ -206,23 +213,27 @@ class logging_players(commands.Cog):
                                 if player["game_id"] == second_game_id
                             )
 
-                            steam_decimal = int(player_data['steam_hex'], 16)  # Convert hex to decimal
-                            steam_link = f"https://steamcommunity.com/profiles/{steam_decimal}"
+                            await create_and_send_embed(
+                                self,
+                                channel,
+                                f"{player_data['steam_name']} Left the Server",
+                                player_data["discord_id"],
+                                player_data["game_id"],
+                                f"Joined at {full_date_str}",
+                                discord.Color.from_rgb(231, 143, 142)
+                            )
 
-                            embed = discord.Embed(
-                                color=discord.Color.from_rgb(236, 100, 75)
-                            )
-                            embed.add_field(
-                                name=f"",
-                                value=f"**<@{player_data['discord_id']}> left the server.\n{player_data['steam_name']} - {player_data['steam_hex']}**\n[Steam Profile]({steam_link})\n\n<t:{ts}:F>",
-                                inline=False,
-                            )
-                            await channel.send(embed=embed)
+                            if is_connection_alive(conn):
+                                conn.commit()
+                                pass
+                            else:
+                                conn = sqlite3.connect('players.db')
+                                cursor = conn.cursor()
 
                             # Update the all_players with left_at timestamp
                             cursor.execute(
                                 "UPDATE all_players SET left_at = ? WHERE game_id = ?",
-                                (f"<t:{ts}:t>", player_data["game_id"]),
+                                (full_date_str, player_data["game_id"]),
                             )
                             conn.commit()
 
@@ -240,18 +251,22 @@ class logging_players(commands.Cog):
                                 if player["game_id"] == second_game_id
                             )
 
-                            steam_decimal = int(player_data['steam_hex'], 16)  # Convert hex to decimal
-                            steam_link = f"https://steamcommunity.com/profiles/{steam_decimal}"
+                            await create_and_send_embed(
+                                self,
+                                channel,
+                                f"{player_data['steam_name']} Joined the Server",
+                                player_data["discord_id"],
+                                player_data["game_id"],
+                                f"Joined at {full_date_str}",
+                                discord.Color.from_rgb(27, 153, 139)
+                            )
 
-                            embed = discord.Embed(
-                                color=discord.Color.from_rgb(111, 194, 118)
-                            )
-                            embed.add_field(
-                                name=f"",
-                                value=f"**<@{player_data['discord_id']}> joined the server.\n{player_data['steam_name']} - {player_data['steam_hex']}**\n[Steam Profile]({steam_link})\n\n<t:{ts}:F>",
-                                inline=False,
-                            )
-                            await channel.send(embed=embed)
+                            if is_connection_alive(conn):
+                                conn.commit()
+                                pass
+                            else:
+                                conn = sqlite3.connect('players.db')
+                                cursor = conn.cursor()
 
                             # Insert or update the player into all_players
                             cursor.execute(
@@ -270,7 +285,7 @@ class logging_players(commands.Cog):
                                     player_data["license2_id"],
                                     player_data["xbl"],
                                     player_data["live_id"],
-                                    f"<t:{ts}:t>",
+                                    full_date_str,
                                     "Hasn't left yet.",
                                 ),
                             )
@@ -295,7 +310,6 @@ class logging_players(commands.Cog):
                                     player_data["live_id"],
                                 ),
                             )
-                            conn.commit()
 
                     if self.logging_executed:
                         self.logging_executed = False
@@ -322,44 +336,11 @@ class logging_players(commands.Cog):
 
             finally:
                 conn.close()
-            
+
         finally:
             conn.close()
             self.is_running = False
 
-    @commands.command()
-    @commands.is_owner()  # Ensures only the bot owner can start/stop the log
-    async def stoplog(self, ctx):
-        if self.logging_players_loop.is_running():
-            try:
-                self.logging_players_loop.cancel()
-                embed = discord.Embed(
-                    title="", color=discord.Color.from_rgb(255, 165, 0)
-                )
-                embed.set_author(name="Logging has been stopped.")
-            except Exception as e:
-                print(e)
-        else:
-            embed = discord.Embed(title="", color=discord.Color.from_rgb(255, 102, 102))
-            embed.set_author(name="Logging has already been stopped.")
-        await ctx.send(embed=embed)
-
-    @commands.command()
-    @commands.is_owner()  # Ensures only the bot owner can start/stop the log
-    async def startlog(self, ctx):
-        if not self.logging_players_loop.is_running():
-            try:
-                self.logging_players_loop.start()
-                embed = discord.Embed(
-                    title="", color=discord.Color.from_rgb(255, 165, 0)
-                )
-                embed.set_author(name="Logging has been started.")
-            except Exception as e:
-                print(e)
-        else:
-            embed = discord.Embed(title="", color=discord.Color.from_rgb(204, 255, 204))
-            embed.set_author(name="Logging has already been initialized.")
-        await ctx.send(embed=embed)
 
     @commands.command()
     async def config(
@@ -454,6 +435,38 @@ class logging_players(commands.Cog):
             await ctx.send(embed=embednotok)
 
 
+def is_connection_alive(conn):
+    try:
+        conn.execute("SELECT 1")
+        return True
+    except sqlite3.ProgrammingError:
+        return False
+
+
+async def create_and_send_embed(self, channel, title, discord_id, game_id, footer_text, color):
+    user = await self.bot.fetch_user(discord_id)
+    discord_username = user.name
+    user_avatar_url = str(user.avatar.url)
+    bot_avatar_url = str(self.bot.user.avatar.url)
+    discord_link = f"https://discordapp.com/users/{discord_id}"
+    
+    steam_decimal = int(discord_id, 16)
+    steam_link = f"https://steamcommunity.com/profiles/{steam_decimal}"
+
+    embed = discord.Embed(
+        title=title,
+        color=color
+    )
+    embed.set_author(name=discord_username, icon_url=user_avatar_url)
+    embed.set_thumbnail(url=bot_avatar_url)
+    embed.add_field(name=f"", value=f"**Ingame ID:** {game_id}", inline=False)
+    embed.add_field(name=f"", value=f"**Discord ID:** [{discord_id}]({discord_link})", inline=False)
+    embed.add_field(name=f"", value=f"**Steam Hex:** [{discord_id}]({steam_link})", inline=False)
+    embed.set_footer(text=footer_text)
+
+    await channel.send(embed=embed)
+
+
 # Function to fetch config data from the database
 def fetch_config_from_db():
     conn = sqlite3.connect("config.db")
@@ -479,89 +492,80 @@ def fetch_config_from_db():
     return None, None, None  # Return None if no record found
 
 
+async def send_embed_json(channel, description, color, full_date_str):
+    embed = discord.Embed(title="", color=color)
+    embed.add_field(name=description, value=full_date_str, inline=False)
+    await channel.send(embed=embed)
+
+
+async def set_bot_status_json(status, activity_type, name):
+    await logging_players.bot.change_presence(
+        status=status,
+        activity=discord.Activity(type=activity_type, name=name),
+    )
+
+
 async def connecting_json_data(self):
     playerdata, _, channelid = fetch_config_from_db()
     channel = self.bot.get_channel(channelid)
     utc_now = datetime.utcnow()
-    gmt_plus_3 = utc_now + timedelta(hours=3)
-    ts = int(gmt_plus_3.timestamp())
+    gmt_plus_3_time = utc_now + timedelta(hours=3)
+    full_date_str = gmt_plus_3_time.strftime("%H:%M:%S - %d/%m/%Y")
 
-    for _ in range(3):  # Try to make a request 3 times
+    for _ in range(3):  # Try 3 times to make a request
         try:
-            current_time = gmt_plus_3.time()
+            current_time = gmt_plus_3_time.time()
 
-            if (current_time >= time(17, 0) and current_time <= time(17, 5)) or (
-                current_time >= time(6, 0) and current_time <= time(6, 5)
-            ):
-                embednotok = discord.Embed(
-                    title="Error fetching player data",
-                    color=discord.Color.from_rgb(236, 100, 75),
+            if time(17, 0) <= current_time <= time(17, 5) or time(
+                6, 0
+            ) <= current_time <= time(6, 5):
+                await send_embed_json(
+                    channel,
+                    "Server is probably restarting.\nBot will try again in 5 minutes.",
+                    discord.Color.from_rgb(139, 139, 174),
+                    full_date_str,
                 )
-                embednotok.add_field(
-                    name=f"Server is probably restarting.\nBot will try again in 5 minutes.",
-                    value=f"<t:{ts}:F>",
-                    inline=False,
-                )
-                await channel.send(embed=embednotok)
+                
                 await self.bot.change_presence(
-                    status=discord.Status.online,
-                    activity=discord.Activity(
-                        type=discord.ActivityType.watching,
-                        name=f"restart procedure",
-                    ),
-                )
-                print("Waiting for server restart to complete...")
-                await asyncio.sleep(300)  # Pause for 5 minutes
+                status=discord.Status.online,activity=discord.Activity(type=discord.ActivityType.watching, name="restart procedure"),)
+
+                await asyncio.sleep(300)  # Wait for 5 minutes
                 databases.delete_all_data(self)
+                logging_players.old_list_from_outside = None
 
             response = requests.get(playerdata)
+            response.raise_for_status()  # Raise an HTTPError if an error occurs
 
             json_data = response.json()
 
             if not self.message_sent:
-                embedok = discord.Embed(
-                    title="Click to go to the file",
-                    url=playerdata,
-                    color=discord.Color.from_rgb(111, 194, 118),
+                await send_embed_json(
+                    channel,
+                    "Json file reached, logging.",
+                    discord.Color.from_rgb(255, 225, 168),
+                    full_date_str,
                 )
-                embedok.add_field(
-                    name="JSON file reached, logging.",
-                    value=f"<t:{ts}:F>",
-                    inline=False,
-                )
-                await channel.send(embed=embedok)
                 self.message_sent = True
+
             return json_data
 
-        except Exception as e:
+        except (requests.RequestException, json.JSONDecodeError) as e:
             print(f"Error in connecting_json_data: {e}")
-            print(f"Waiting for 60 seconds... Retrying...")
-            await asyncio.sleep(60)  # Wait for 60 seconds before retrying
+            await asyncio.sleep(60)  # Wait for 60 seconds
 
-    ts = int(gmt_plus_3.timestamp())
-
-    # If after 3 attempts, the data is still not fetched
-    print("Failed to fetch JSON data after 3 attempts.")
-    embed = discord.Embed(
-        title="Error fetching player data",
-        color=discord.Color.from_rgb(236, 100, 75),
+    await send_embed_json(
+        channel,
+        "Logging player loop aborted.\nBot could not connect json data 3 times.",
+        discord.Color.from_rgb(217, 51, 51),
+        full_date_str,
     )
-    embed.add_field(
-        name=f"Logging player loop aborted.\nBot could not connect json data 3 times.",
-        value=f"<t:{ts}:F>",
-        inline=False,
-    )
-    await channel.send(embed=embed)
-    await self.bot.change_presence(
-        status=discord.Status.online,
-        activity=discord.Activity(
-            type=discord.ActivityType.watching,
-            name=f"emptiness",
-        ),
+    await set_bot_status_json(
+        discord.Status.online, discord.ActivityType.watching, "emptiness"
     )
 
     logging_players.logging_players_loop.cancel()
     return 1
+
 
 def setup(bot):
     bot.add_cog(logging_players(bot))
