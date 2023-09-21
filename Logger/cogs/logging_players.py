@@ -144,13 +144,6 @@ class logging_players(commands.Cog):
                         }
 
                         if self.logging_executed:
-                            if is_connection_alive(conn):
-                                conn.commit()
-                                pass
-                            else:
-                                conn = sqlite3.connect("players.db")
-                                cursor = conn.cursor()
-
                             # Insert or update the player into all_players
                             cursor.execute(
                                 """
@@ -215,17 +208,11 @@ class logging_players(commands.Cog):
                                 channel,
                                 f"{player_data['steam_name']} Left the Server",
                                 player_data["discord_id"],
+                                player_data["steam_hex"],
                                 player_data["game_id"],
                                 f"Joined at {full_date_str}",
                                 discord.Color.from_rgb(231, 143, 142),
                             )
-
-                            if is_connection_alive(conn):
-                                conn.commit()
-                                pass
-                            else:
-                                conn = sqlite3.connect("players.db")
-                                cursor = conn.cursor()
 
                             # Update the all_players with left_at timestamp
                             cursor.execute(
@@ -253,17 +240,11 @@ class logging_players(commands.Cog):
                                 channel,
                                 f"{player_data['steam_name']} Joined the Server",
                                 player_data["discord_id"],
+                                player_data["steam_hex"],
                                 player_data["game_id"],
                                 f"Joined at {full_date_str}",
                                 discord.Color.from_rgb(27, 153, 139),
                             )
-
-                            if is_connection_alive(conn):
-                                conn.commit()
-                                pass
-                            else:
-                                conn = sqlite3.connect("players.db")
-                                cursor = conn.cursor()
 
                             # Insert or update the player into all_players
                             cursor.execute(
@@ -288,6 +269,7 @@ class logging_players(commands.Cog):
                             )
                             conn.commit()
 
+
                             # Insert the player into current_players
                             cursor.execute(
                                 """
@@ -307,6 +289,7 @@ class logging_players(commands.Cog):
                                     player_data["live_id"],
                                 ),
                             )
+                            conn.commit()
 
                     if self.logging_executed:
                         self.logging_executed = False
@@ -439,16 +422,8 @@ class logging_players(commands.Cog):
             await ctx.send(embed=embednotok)
 
 
-def is_connection_alive(conn):
-    try:
-        conn.execute("SELECT 1")
-        return True
-    except sqlite3.ProgrammingError:
-        return False
-
-
 async def create_and_send_embed(
-    self, channel, title, discord_id, game_id, footer_text, color
+    self, channel, title, discord_id, steam_hex, game_id, footer_text, color
 ):
     user = await self.bot.fetch_user(discord_id)
     discord_username = user.name
@@ -456,7 +431,7 @@ async def create_and_send_embed(
     bot_avatar_url = str(self.bot.user.avatar.url)
     discord_link = f"https://discordapp.com/users/{discord_id}"
 
-    steam_decimal = int(discord_id, 16)
+    steam_decimal = int(steam_hex, 16)
     steam_link = f"https://steamcommunity.com/profiles/{steam_decimal}"
 
     embed = discord.Embed(title=title, color=color)
@@ -467,7 +442,7 @@ async def create_and_send_embed(
         name=f"", value=f"**Discord ID:** [{discord_id}]({discord_link})", inline=False
     )
     embed.add_field(
-        name=f"", value=f"**Steam Hex:** [{discord_id}]({steam_link})", inline=False
+        name=f"", value=f"**Steam Hex:** [{steam_hex}]({steam_link})", inline=False
     )
     embed.set_footer(text=footer_text)
 
