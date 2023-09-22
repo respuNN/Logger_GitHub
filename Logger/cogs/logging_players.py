@@ -517,7 +517,7 @@ async def connecting_json_data(self):
 
                 await asyncio.sleep(300)  # Wait for 5 minutes
                 databases.delete_all_data(self)
-                logging_players.old_list_from_outside = None
+                logging_players.old_list_from_outside = []
 
             response = requests.get(playerdata)
             response.raise_for_status()  # Raise an HTTPError if an error occurs
