@@ -490,24 +490,22 @@ async def set_bot_status_json(status, activity_type, name):
 async def connecting_json_data(self):
     playerdata, _, channelid = fetch_config_from_db()
     channel = self.bot.get_channel(channelid)
-    utc_now = datetime.utcnow()
-    gmt_plus_3_time = utc_now + timedelta(hours=3)
-    full_date_str = gmt_plus_3_time.strftime("%H:%M:%S - %d/%m/%Y")
 
     for _ in range(3):  # Try 3 times to make a request
         try:
+            utc_now = datetime.utcnow()
+            gmt_plus_3_time = utc_now + timedelta(hours=3)
+            full_date_str = gmt_plus_3_time.strftime("%H:%M:%S - %d/%m/%Y")
             current_time = gmt_plus_3_time.time()
 
-            if time(17, 0) <= current_time <= time(17, 5) or time(
-                6, 0
-            ) <= current_time <= time(6, 5):
+            if time(17, 0) <= current_time <= time(17, 4) or time(6, 0) <= current_time <= time(6, 4):
                 await send_embed_json(
                     channel,
                     "Server is probably restarting.\nBot will try again in 5 minutes.",
                     discord.Color.from_rgb(139, 139, 174),
                     full_date_str,
                 )
-
+                
                 await self.bot.change_presence(
                     status=discord.Status.online,
                     activity=discord.Activity(
@@ -515,9 +513,9 @@ async def connecting_json_data(self):
                     ),
                 )
 
-                await asyncio.sleep(300)  # Wait for 5 minutes
                 databases.delete_all_data(self)
-                logging_players.old_list_from_outside = []
+                self.old_list_from_outside = []
+                await asyncio.sleep(300)  # Wait for 5 minutes
 
             response = requests.get(playerdata)
             response.raise_for_status()  # Raise an HTTPError if an error occurs
@@ -535,7 +533,7 @@ async def connecting_json_data(self):
 
             return json_data
 
-        except (requests.RequestException, json.JSONDecodeError) as e:
+        except Exception as e:
             print(f"Error in connecting_json_data: {e}")
             await asyncio.sleep(60)  # Wait for 60 seconds
 
