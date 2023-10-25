@@ -210,7 +210,7 @@ class logging_players(commands.Cog):
                                 player_data["discord_id"],
                                 player_data["steam_hex"],
                                 player_data["game_id"],
-                                f"Joined at {full_date_str}",
+                                f"Left at {full_date_str}",
                                 discord.Color.from_rgb(231, 143, 142),
                             )
 
